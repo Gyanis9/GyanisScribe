@@ -361,10 +361,12 @@ namespace
     {
         struct PageMetrics
         {
-            QWidget             *page       = nullptr; ///< 这一页的卡片
-            QWidget             *content    = nullptr; ///< 居中内容列；视图页没有
-            int                  labelWidth = 0;       ///< 本页标签列宽
-            QList<QFormLayout *> forms;                ///< 本页表单，通常一张
+            QWidget             *page         = nullptr; ///< 这一页的卡片
+            QWidget             *content      = nullptr; ///< 居中内容列；视图页没有
+            int                  labelWidth   = 0;       ///< 本页标签列宽
+            int                  numericWidth = 0;       ///< 本页数字框统一宽；没有该类时为 0
+            int                  comboWidth   = 0;       ///< 本页下拉框统一宽；没有该类时为 0
+            QList<QFormLayout *> forms;                  ///< 本页表单，通常一张
         };
 
         // 第一趟先量：所有表单页共用一个内容列宽，翻页时标题与说明不会左右跳
@@ -404,21 +406,40 @@ namespace
                 }
             }
 
-            // 字段按类型收宽：数字框 140、下拉 260、单行文本 340；字段列宽取本页最宽的一条
-            int fieldWidth = 0;
+            // 字段按类型实测：数字框与下拉各自在本页取统一宽，长文本类才占满 340。
+            // 短选项的下拉与三四位数的数字框不再被字段列拉长，右侧的空白随之消失
+            int  numericHint  = 0;
+            int  comboHint    = 0;
+            bool hasWideField = false;
             for (auto *form: forms)
             {
                 for (int row = 0; row < form->rowCount(); ++row)
                 {
                     const auto *field = form->itemAt(row, QFormLayout::FieldRole);
-                    if (field != nullptr && field->widget() != nullptr)
+                    if (field == nullptr || field->widget() == nullptr)
                     {
-                        fieldWidth = std::max(fieldWidth, settingsFieldMaximumWidth(*field->widget()));
+                        continue;
+                    }
+                    const auto *widget = field->widget();
+                    if (qobject_cast<const QAbstractSpinBox *>(widget) != nullptr)
+                    {
+                        numericHint = std::max(numericHint, widget->sizeHint().width());
+                    }
+                    else if (qobject_cast<const QComboBox *>(widget) != nullptr)
+                    {
+                        comboHint = std::max(comboHint, widget->sizeHint().width());
+                    }
+                    else if (qobject_cast<const QCheckBox *>(widget) == nullptr)
+                    {
+                        hasWideField = true;
                     }
                 }
             }
+            const int numericWidth = numericHint > 0 ? std::clamp(numericHint, GyanisScribe::Gui::kNumericFieldMinimumWidth, GyanisScribe::Gui::kNumericFieldMaximumWidth) : 0;
+            const int comboWidth   = comboHint > 0 ? std::clamp(comboHint, GyanisScribe::Gui::kComboFieldMinimumWidth, GyanisScribe::Gui::kComboFieldMaximumWidth) : 0;
+            const int fieldWidth   = std::max({numericWidth, comboWidth, hasWideField ? GyanisScribe::Gui::kFieldMaximumWidth : 0});
             maxContentWidth = std::max(maxContentWidth, labelWidth + GyanisScribe::Gui::kSpacingSmall + fieldWidth);
-            pages.push_back(PageMetrics{.page = page, .content = content, .labelWidth = labelWidth, .forms = forms});
+            pages.push_back(PageMetrics{.page = page, .content = content, .labelWidth = labelWidth, .numericWidth = numericWidth, .comboWidth = comboWidth, .forms = forms});
         }
 
         // 第二趟统一落：内容列同宽并居中；表单字段各自收窄；说明行跟着内容列宽换行
@@ -433,9 +454,24 @@ namespace
                     {
                         label->widget()->setFixedWidth(metrics.labelWidth);
                     }
-                    if (auto *field = form->itemAt(row, QFormLayout::FieldRole); field != nullptr && field->widget() != nullptr)
+                    auto *field  = form->itemAt(row, QFormLayout::FieldRole);
+                    auto *widget = field != nullptr ? field->widget() : nullptr;
+                    if (widget == nullptr)
                     {
-                        field->widget()->setMaximumWidth(settingsFieldMaximumWidth(*field->widget()));
+                        continue;
+                    }
+                    // 同类控件在本页统一宽度：固定宽之后表单不会再把它们拉满字段列
+                    if (qobject_cast<QAbstractSpinBox *>(widget) != nullptr && metrics.numericWidth > 0)
+                    {
+                        widget->setFixedWidth(metrics.numericWidth);
+                    }
+                    else if (qobject_cast<QComboBox *>(widget) != nullptr && metrics.comboWidth > 0)
+                    {
+                        widget->setFixedWidth(metrics.comboWidth);
+                    }
+                    else
+                    {
+                        widget->setMaximumWidth(settingsFieldMaximumWidth(*widget));
                     }
                 }
             }

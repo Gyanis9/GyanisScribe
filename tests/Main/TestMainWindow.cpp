@@ -770,6 +770,52 @@ namespace
     }
 
     /**
+     * @brief 钉住数字框与下拉按内容收宽，长文本类仍占满内容列
+     * @details 这两类控件此前只设上限、由表单拉满字段列：短选项的下拉与三四位数的数字框
+     *          右侧留出一大片空白。判据要求同类同宽、落在宽度区间内，且路径行不被一起收窄。
+     */
+    TEST_F(MainWindowFixture, SettingsNumericAndComboFieldsSizeToTheirContent)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::General);
+        QCoreApplication::processEvents();
+        auto *scroll = qobject_cast<QScrollArea *>(stack()->currentWidget());
+        ASSERT_NE(scroll, nullptr);
+        auto *card = scroll->widget();
+        ASSERT_NE(card, nullptr);
+
+        const auto spins  = card->findChildren<QAbstractSpinBox *>();
+        const auto combos = card->findChildren<QComboBox *>();
+        ASSERT_FALSE(spins.isEmpty()) << "通用页没有数字框，前提没构造出来";
+        ASSERT_FALSE(combos.isEmpty()) << "通用页没有下拉框，前提没构造出来";
+
+        const int spinWidth = spins.front()->width();
+        EXPECT_LE(spinWidth, GyanisScribe::Gui::kNumericFieldMaximumWidth) << "数字框比宽度上限还长";
+        EXPECT_GE(spinWidth, GyanisScribe::Gui::kNumericFieldMinimumWidth) << "数字框窄到看不清数值";
+        for (auto *spin: spins)
+        {
+            EXPECT_EQ(spin->width(), spinWidth) << "同页数字框宽度不一致";
+        }
+
+        const int comboWidth = combos.front()->width();
+        EXPECT_LE(comboWidth, GyanisScribe::Gui::kComboFieldMaximumWidth) << "下拉框比宽度上限还长";
+        EXPECT_GE(comboWidth, GyanisScribe::Gui::kComboFieldMinimumWidth) << "下拉框窄到看不清选项";
+        for (auto *combo: combos)
+        {
+            EXPECT_EQ(combo->width(), comboWidth) << "同页下拉宽度不一致";
+        }
+
+        // 长文本类仍要占满内容列：截图页的路径输入框不能被一起收窄
+        m_window->open(MainWindowPage::Capture);
+        QCoreApplication::processEvents();
+        auto *captureScroll = qobject_cast<QScrollArea *>(stack()->currentWidget());
+        ASSERT_NE(captureScroll, nullptr);
+        auto *pathEdit = captureScroll->widget()->findChild<QLineEdit *>();
+        ASSERT_NE(pathEdit, nullptr);
+        EXPECT_GE(pathEdit->width(), GyanisScribe::Gui::kFieldMaximumWidth - 40) << "路径行被一起收窄了";
+    }
+
+    /**
      * @brief 钉住设置页的内容列在卡片里居中
      * @details 表单全部左靠会让宽窗右侧空出一大片；内容列与卡片左右留白应当基本相等。
      */

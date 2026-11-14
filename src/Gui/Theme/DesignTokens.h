@@ -532,11 +532,13 @@ namespace GyanisScribe::Gui
     /// 一行设置项里长文本字段的最大宽度：路径与模板拉到整窗宽时，「这一格填什么」就看不出来了
     inline constexpr int kFieldMaximumWidth = 340;
 
-    /// 下拉字段的最大宽度：选项文字比路径短，收到这一档后表单不会整排都是长条
+    /// 下拉字段的宽度区间：按最长选项实测后夹在这一档，短选项不拉长、长选项不撑破
+    inline constexpr int kComboFieldMinimumWidth = 140;
     inline constexpr int kComboFieldMaximumWidth = 260;
 
-    /// 数字字段的最大宽度：三到四位数加单位用不着半条表单
-    inline constexpr int kNumericFieldMaximumWidth = 140;
+    /// 数字字段的宽度区间：三到四位数加单位用不着半条表单
+    inline constexpr int kNumericFieldMinimumWidth = 96;
+    inline constexpr int kNumericFieldMaximumWidth = 120;
 
     /// 设置窗的默认尺寸与最小尺寸：最小宽度按内容实测后可能再抬高；
     /// 最小宽与默认同档，是因为记忆库页的两排动作在 760 时已经挤到右缘
