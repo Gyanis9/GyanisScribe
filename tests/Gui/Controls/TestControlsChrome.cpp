@@ -15,6 +15,7 @@
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
@@ -321,4 +322,36 @@ TEST(PopupSurfaceFixture, PopupWindowsMaskTheirCornersBeforeTheFirstFrame)
     ASSERT_FALSE(tip.mask().isEmpty()) << "提示窗第一帧没有掩膜";
     EXPECT_FALSE(tip.mask().contains(QPoint{0, 0})) << "提示窗左上角没被切掉";
     tip.hide();
+}
+
+/**
+ * @brief 钉住弹层淡入：首帧透明，动效结束后完全不透明且落在最终位置
+ * @details 关闭界面动效的机器上这段过渡按设计不播放，用例跳过而不是判失败
+ */
+TEST(PopupSurfaceFixture, PopupRevealFadesInWhenEffectsAreEnabled)
+{
+    if (!QApplication::isEffectEnabled(Qt::UI_AnimateCombo))
+    {
+        GTEST_SKIP() << "系统关闭了界面动效，过渡按设计不播放";
+    }
+    GyanisScribe::Gui::ComboBox combo;
+    combo.addItems({QStringLiteral("中文"), QStringLiteral("English")});
+    combo.show();
+    QCoreApplication::processEvents();
+    combo.showPopup();
+
+    auto *popup = combo.view() != nullptr ? combo.view()->window() : nullptr;
+    ASSERT_NE(popup, nullptr);
+    EXPECT_LT(popup->windowOpacity(), 1.0) << "首帧不是透明的，淡入之前会闪一帧";
+    const QPoint target = popup->pos() - QPoint{0, 6};
+
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < 300)
+    {
+        QCoreApplication::processEvents();
+    }
+    EXPECT_DOUBLE_EQ(popup->windowOpacity(), 1.0) << "动效结束后没有回到完全不透明";
+    EXPECT_EQ(popup->pos(), target) << "动效结束后没有落在最终位置";
+    combo.hidePopup();
 }

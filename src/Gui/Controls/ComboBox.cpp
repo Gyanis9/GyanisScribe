@@ -8,9 +8,11 @@
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/PopupSurface.h"
 
+#include <QApplication>
 #include <QFontMetrics>
 #include <QPainter>
 #include <QPen>
+#include <QVariantAnimation>
 
 namespace
 {
@@ -44,6 +46,45 @@ namespace
         }
         GyanisScribe::Gui::preparePopupSurface(popupWindow, GyanisScribe::Core::CornerRole::Control);
     }
+
+    /// 弹层出现的过渡时长与上浮距离：短到不挡操作，长到看得出方向
+    constexpr int kPopupRevealMilliseconds = 120;
+    constexpr int kPopupRiseDistance       = 6;
+
+    /**
+     * @brief 让刚显示的弹层从下方 6px 淡入回位
+     * @param popup 弹层窗口
+     * @details 动画只在系统开启「界面动效」时播放；窗口透明度会强制 Windows 走分层窗口，
+     *          圆角掩膜已由 PopupSurface 在首帧前落好，二者互不改写
+     */
+    void playPopupReveal(QWidget *popup)
+    {
+        if (popup == nullptr || !QApplication::isEffectEnabled(Qt::UI_AnimateCombo))
+        {
+            return;
+        }
+        const QPoint target = popup->pos();
+        popup->move(target + QPoint{0, kPopupRiseDistance});
+        auto *animation = new QVariantAnimation{popup};
+        animation->setDuration(kPopupRevealMilliseconds);
+        animation->setStartValue(0.0);
+        animation->setEndValue(1.0);
+        animation->setEasingCurve(QEasingCurve::OutCubic);
+        QObject::connect(animation, &QVariantAnimation::valueChanged, popup,
+                         [popup, target](const QVariant &value)
+                         {
+                             const qreal progress = value.toReal();
+                             popup->setWindowOpacity(progress);
+                             popup->move(target + QPoint{0, qRound((1.0 - progress) * kPopupRiseDistance)});
+                         });
+        QObject::connect(animation, &QVariantAnimation::finished, popup,
+                         [popup, target]
+                         {
+                             popup->setWindowOpacity(1.0);
+                             popup->move(target);
+                         });
+        animation->start(QAbstractAnimation::DeleteWhenStopped);
+    }
 } // namespace
 
 namespace GyanisScribe::Gui
@@ -57,8 +98,18 @@ namespace GyanisScribe::Gui
 
     void ComboBox::showPopup()
     {
+        // 首帧必须是透明的：先置 0 再显示，避免淡入之前闪一帧不透明弹层
+        QWidget *popupWindow = view() != nullptr ? view()->window() : nullptr;
+        if (popupWindow != nullptr && QApplication::isEffectEnabled(Qt::UI_AnimateCombo))
+        {
+            popupWindow->setWindowOpacity(0.0);
+        }
         QComboBox::showPopup();
         preparePopupWindow(*this);
+        if (popupWindow != nullptr)
+        {
+            playPopupReveal(popupWindow);
+        }
         // 委托在视图构造时就已装好，Qt 打开弹层时不会改回来；这里只做类型核对，
         // 弹层被换成别的委托才补装，正常打开不再新建
         auto *popupView = view();
@@ -92,8 +143,17 @@ namespace GyanisScribe::Gui
 
     void FontComboBox::showPopup()
     {
+        QWidget *popupWindow = view() != nullptr ? view()->window() : nullptr;
+        if (popupWindow != nullptr && QApplication::isEffectEnabled(Qt::UI_AnimateCombo))
+        {
+            popupWindow->setWindowOpacity(0.0);
+        }
         QFontComboBox::showPopup();
         preparePopupWindow(*this);
+        if (popupWindow != nullptr)
+        {
+            playPopupReveal(popupWindow);
+        }
         // 同 ComboBox：字体委托在构造时就已装好，只在被换掉时兜底补装，字体预览不会丢
         auto *popupView = view();
         if (popupView != nullptr && qobject_cast<FontItemDelegate *>(popupView->itemDelegate()) == nullptr)
