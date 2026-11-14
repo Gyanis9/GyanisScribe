@@ -25,12 +25,20 @@ namespace
         }
         const auto path = GyanisScribe::Core::continuousCornerPath(QRectF{QPointF{0.0, 0.0}, QSizeF{window->size()}},
                                                                    GyanisScribe::Core::cornerShapeFor(role, QSizeF{window->size()}));
-        window->setMask(QRegion{path.toFillPolygon().toPolygon()});
+        const auto region = QRegion{path.toFillPolygon().toPolygon()};
+        // 掩膜没变就不重设：每次绘制都 setMask 会把窗口重新裁一遍，能明显感到顿一下
+        if (window->mask() == region)
+        {
+            return;
+        }
+        window->setMask(region);
     }
 
     /**
-     * @brief 跟着窗口显示与改尺寸重算圆角掩膜
-     * @details 弹层每次显示前尺寸才定下来，两个事件都要接
+     * @brief 跟着窗口显示、改尺寸与绘制重算圆角掩膜
+     * @details 弹层在 showPopup 内部才定下最终尺寸，而窗口此时已经可见：只接显示与改尺寸
+     *          会让第一帧先露出方形四角。绘制事件在首帧提交之前，掩膜在这里补上，
+     *          用户看到的第一帧就是圆角；尺寸不变时不重算
      */
     class MaskFilter final : public QObject
     {
@@ -42,9 +50,15 @@ namespace
     protected:
         bool eventFilter(QObject *watched, QEvent *event) override
         {
-            if (event->type() == QEvent::Show || event->type() == QEvent::Resize)
+            switch (event->type())
             {
-                applyPopupMask(m_window, m_role);
+                case QEvent::Show:
+                case QEvent::Resize:
+                case QEvent::Paint:
+                    applyPopupMask(m_window, m_role);
+                    break;
+                default:
+                    break;
             }
             return QObject::eventFilter(watched, event);
         }

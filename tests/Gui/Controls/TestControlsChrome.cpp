@@ -293,3 +293,32 @@ TEST(PopupSurfaceFixture, TooltipWindowsGetATranslucentSurfaceBeforeDisplay)
     tip.ensurePolished();
     EXPECT_TRUE(tip.testAttribute(Qt::WA_TranslucentBackground)) << "提示窗没有透明底，圆角外会是一块黑角";
 }
+
+/**
+ * @brief 钉住浮层掩膜在首帧前就位，且不会被 Qt 的原生菜单掩膜刷成方角
+ * @details 下拉容器在 resizeEvent 里会按 SH_Menu_Mask 再装一次原生掩膜，那圈掩膜是方的，
+ *          会把连续曲率掩膜盖掉，第一帧就露出方角。判据直接查四角是否被切掉。
+ */
+TEST(PopupSurfaceFixture, PopupWindowsMaskTheirCornersBeforeTheFirstFrame)
+{
+    GyanisScribe::Gui::ComboBox combo;
+    combo.addItems({QStringLiteral("中文"), QStringLiteral("English")});
+    combo.show();
+    QCoreApplication::processEvents();
+    combo.showPopup();
+
+    auto *popup = combo.view() != nullptr ? combo.view()->window() : nullptr;
+    ASSERT_NE(popup, nullptr);
+    ASSERT_FALSE(popup->mask().isEmpty()) << "弹层显示后掩膜才补，第一帧会先露出方形四角";
+    EXPECT_EQ(popup->mask().boundingRect().size(), popup->size()) << "掩膜尺寸与窗口不一致";
+    EXPECT_FALSE(popup->mask().contains(QPoint{0, 0})) << "左上角没被切掉：圆角被 Qt 的原生掩膜覆盖了";
+    EXPECT_TRUE(popup->mask().contains(popup->rect().center())) << "掩膜把面板中心也裁掉了";
+    combo.hidePopup();
+
+    QLabel tip{QStringLiteral("说明"), nullptr, Qt::ToolTip};
+    tip.resize(160, 32);
+    tip.show();
+    ASSERT_FALSE(tip.mask().isEmpty()) << "提示窗第一帧没有掩膜";
+    EXPECT_FALSE(tip.mask().contains(QPoint{0, 0})) << "提示窗左上角没被切掉";
+    tip.hide();
+}

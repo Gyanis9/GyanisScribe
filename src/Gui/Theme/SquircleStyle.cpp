@@ -116,6 +116,13 @@ namespace GyanisScribe::Gui
         {
             return 0;
         }
+        // 下拉弹层与自绘菜单在 resizeEvent 里同样会按 SH_Menu_Mask 再装一次原生掩膜，
+        // 那圈掩膜是方的，会把 PopupSurface 套好的连续曲率掩膜覆盖掉，第一帧就露出方角。
+        // 对这两种自绘浮层说「没有原生掩膜」，圆角只由 PopupSurface 负责
+        if (hint == SH_Menu_Mask && returnData != nullptr && (isSquircleMenu(widget) || (widget != nullptr && widget->inherits("QComboBoxPrivateContainer"))))
+        {
+            return 0;
+        }
         return QProxyStyle::styleHint(hint, option, widget, returnData);
     }
 
