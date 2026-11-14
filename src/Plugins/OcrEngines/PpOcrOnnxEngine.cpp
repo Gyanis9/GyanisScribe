@@ -199,11 +199,13 @@ namespace GyanisScribe::Plugins
             const OrtApi *runtimeApi = apiBase->GetApi(ORT_API_VERSION);
             if (runtimeApi == nullptr)
             {
-                const char *version = apiBase->GetVersionString();
+                // 版本串指向 DLL 映像里的静态区：先拷进自己的串再卸载，卸载后原指针随时可能失效
+                const char       *versionText = apiBase->GetVersionString();
+                const std::string version     = versionText != nullptr ? std::string(versionText) : std::string("未知");
                 FreeLibrary(loaded);
                 return QString::fromStdString(Base::uiFormat(
                         Base::uiTextUtf8("onnxruntime.dll 的接口版本与程序不符：程序需要 ONNX Runtime API 版本 {}，实际库是 {}。请重新安装本程序以恢复随包的运行库"),
-                        ORT_API_VERSION, version != nullptr ? version : "未知"));
+                        ORT_API_VERSION, version));
             }
 
             library = loaded;
@@ -401,7 +403,7 @@ namespace GyanisScribe::Plugins
         }
         if (inputCount == 0 || outputCount == 0)
         {
-            return std::unexpected(modelFailure(modelFileName, QStringLiteral("模型没有输入或没有输出")));
+            return std::unexpected(modelFailure(modelFileName, QString::fromStdString(Base::uiTextUtf8("模型没有输入或没有输出"))));
         }
 
         OrtAllocator *allocator = nullptr;
@@ -442,7 +444,7 @@ namespace GyanisScribe::Plugins
         }
         if (tensorInfo == nullptr)
         {
-            return std::unexpected(modelFailure(modelFileName, QStringLiteral("输入不是张量")));
+            return std::unexpected(modelFailure(modelFileName, QString::fromStdString(Base::uiTextUtf8("输入不是张量"))));
         }
 
         std::size_t dimensionCount = 0;
@@ -477,7 +479,7 @@ namespace GyanisScribe::Plugins
         }
         if (elementType != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT)
         {
-            return std::unexpected(modelFailure(modelFileName, QStringLiteral("输出不是 FLOAT 张量")));
+            return std::unexpected(modelFailure(modelFileName, QString::fromStdString(Base::uiTextUtf8("输出不是 FLOAT 张量"))));
         }
 
         FloatTensorView view;
@@ -509,7 +511,7 @@ namespace GyanisScribe::Plugins
         }
         if (rawData == nullptr)
         {
-            return std::unexpected(modelFailure(modelFileName, QStringLiteral("输出张量为空")));
+            return std::unexpected(modelFailure(modelFileName, QString::fromStdString(Base::uiTextUtf8("输出张量为空"))));
         }
 
         view.data = static_cast<const float *>(rawData);
@@ -650,17 +652,17 @@ namespace GyanisScribe::Plugins
         }
         if (detView->dimensions.size() < 2)
         {
-            return std::unexpected(modelFailure(kPpOcrDetModelFileName, QStringLiteral("输出维数不足，取不到概率图尺寸")));
+            return std::unexpected(modelFailure(kPpOcrDetModelFileName, QString::fromStdString(Base::uiTextUtf8("输出维数不足，取不到概率图尺寸"))));
         }
         const std::int64_t mapHeight = detView->dimensions[detView->dimensions.size() - 2];
         const std::int64_t mapWidth  = detView->dimensions.back();
         if (mapHeight <= 0 || mapWidth <= 0)
         {
-            return std::unexpected(modelFailure(kPpOcrDetModelFileName, QStringLiteral("输出尺寸不是正数")));
+            return std::unexpected(modelFailure(kPpOcrDetModelFileName, QString::fromStdString(Base::uiTextUtf8("输出尺寸不是正数"))));
         }
         if (detView->elementCount != static_cast<std::size_t>(mapWidth) * static_cast<std::size_t>(mapHeight))
         {
-            return std::unexpected(modelFailure(kPpOcrDetModelFileName, QStringLiteral("输出元素数与概率图尺寸不符")));
+            return std::unexpected(modelFailure(kPpOcrDetModelFileName, QString::fromStdString(Base::uiTextUtf8("输出元素数与概率图尺寸不符"))));
         }
 
         const QVector<Core::PpOcrTextBox> textBoxes =
@@ -717,17 +719,17 @@ namespace GyanisScribe::Plugins
             }
             if (recView->dimensions.size() < 2)
             {
-                return std::unexpected(modelFailure(kPpOcrRecModelFileName, QStringLiteral("输出维数不足，取不到时间步与类别数")));
+                return std::unexpected(modelFailure(kPpOcrRecModelFileName, QString::fromStdString(Base::uiTextUtf8("输出维数不足，取不到时间步与类别数"))));
             }
             const std::int64_t timeSteps    = recView->dimensions[recView->dimensions.size() - 2];
             const std::int64_t classCount   = recView->dimensions.back();
             if (timeSteps <= 0 || classCount <= 0)
             {
-                return std::unexpected(modelFailure(kPpOcrRecModelFileName, QStringLiteral("输出尺寸不是正数")));
+                return std::unexpected(modelFailure(kPpOcrRecModelFileName, QString::fromStdString(Base::uiTextUtf8("输出尺寸不是正数"))));
             }
             if (recView->elementCount != static_cast<std::size_t>(timeSteps) * static_cast<std::size_t>(classCount))
             {
-                return std::unexpected(modelFailure(kPpOcrRecModelFileName, QStringLiteral("输出元素数与时间步乘类别数不符")));
+                return std::unexpected(modelFailure(kPpOcrRecModelFileName, QString::fromStdString(Base::uiTextUtf8("输出元素数与时间步乘类别数不符"))));
             }
 
             const Core::PpOcrDecodedText decoded =
