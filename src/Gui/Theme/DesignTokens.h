@@ -94,47 +94,47 @@ namespace GyanisScribe::Gui
     /// 浅色主题的语义色：windowBackground、surface、controlFill 三档微明度差配一支主色；
     /// 对比度阈值由 ThemeManagerFixture.SemanticColorPairsMeetWcagContrast 对三档逐角色现算
     inline constexpr ThemePalette kLightPalette{
-            QColor{243, 244, 246}, // windowBackground：#F3F4F6，冷中性底
-            QColor{255, 255, 255}, // surface：#FFFFFF，卡片纯白
-            QColor{15, 23, 42},    // text：#0F172A，slate-900
-            QColor{70, 80, 92},    // secondaryText：#46505C，对窗口底 7.45:1、对卡片底 8.20:1
-            QColor{229, 231, 235}, // border：#E5E7EB
-            kAccentColor,          // accent：#236DE9
+            QColor{245, 245, 243}, // windowBackground
+            QColor{252, 252, 251}, // surface
+            QColor{20, 20, 18},    // text
+            QColor{83, 83, 77},    // secondaryText
+            QColor{231, 231, 226}, // border
+            kAccentColor,          // accent
             QColor{255, 255, 255}, // onAccent
-            QColor{219, 234, 254}, // selection：#DBEAFE
-            QColor{31, 41, 55},    // icon：#1F2937
+            QColor{216, 229, 249}, // selection
+            QColor{26, 26, 25},    // icon：#1A1A19，暖近黑
             QColor{59, 125, 33},   // success
             QColor{202, 57, 50},   // danger
-            QColor{233, 235, 238}, // mutedFill：#E9EBEE
-            QColor{241, 243, 245}, // controlFill：#F1F3F5
-            QColor{233, 236, 239}, // hover：#E9ECEF
-            QColor{226, 229, 233}, // pressed：#E2E5E9
-            QColor{29, 78, 216},   // accentHover：#1D4ED8
-            QColor{239, 246, 255}, // accentSoft：#EFF6FF
-            QColor{199, 204, 211}, // borderStrong：#C7CCD3
+            QColor{237, 237, 233}, // mutedFill
+            QColor{242, 242, 238}, // controlFill
+            QColor{233, 233, 228}, // hover
+            QColor{227, 227, 222}, // pressed
+            QColor{29, 97, 213},   // accentHover
+            QColor{229, 238, 250}, // accentSoft
+            QColor{226, 226, 221}, // borderStrong
     };
 
     /// 深色主题的语义色：窗口底与卡片同值，避免连续曲率圆角外露出近黑缺口；
     /// 卡片边界改由 1px borderStrong 描边给出，控件仍比卡片亮一档
     inline constexpr ThemePalette kDarkPalette{
-            QColor{23, 25, 30},    // windowBackground：#17191E，与 surface 同值，圆角外不露近黑缺口
-            QColor{23, 25, 30},    // surface：#17191E
-            QColor{230, 232, 236}, // text：#E6E8EC
-            QColor{166, 173, 186}, // secondaryText：#A6ADBA
-            QColor{46, 50, 58},    // border：#2E323A
-            QColor{76, 141, 255},  // accent：#4C8DFF
-            QColor{11, 18, 32},    // onAccent：#0B1220
-            QColor{38, 52, 77},    // selection：#26344D
-            QColor{242, 244, 248}, // icon：#F2F4F8
+            QColor{21, 21, 21},    // windowBackground：与 surface 同值，圆角外不再露出近黑缺口
+            QColor{21, 21, 21},    // surface
+            QColor{232, 232, 227}, // text
+            QColor{176, 176, 170}, // secondaryText
+            QColor{36, 36, 34},    // border
+            QColor{76, 141, 255},  // accent
+            QColor{11, 11, 10},    // onAccent
+            QColor{42, 59, 87},    // selection
+            QColor{245, 245, 243}, // icon：#F5F5F3，暖白
             QColor{155, 227, 90},  // success
             QColor{255, 122, 113}, // danger
-            QColor{20, 22, 26},    // mutedFill：#14161A，比卡片再深一档
-            QColor{35, 38, 44},    // controlFill：#23262C
-            QColor{42, 46, 53},    // hover：#2A2E35
-            QColor{48, 53, 61},    // pressed：#30353D
-            QColor{59, 123, 240},  // accentHover：#3B7BF0
-            QColor{30, 42, 68},    // accentSoft：#1E2A44
-            QColor{74, 79, 89},    // borderStrong：#4A4F59
+            QColor{17, 17, 16},    // mutedFill
+            QColor{29, 29, 28},    // controlFill
+            QColor{35, 35, 33},    // hover
+            QColor{41, 41, 39},    // pressed
+            QColor{61, 127, 242},  // accentHover
+            QColor{34, 52, 77},    // accentSoft
+            QColor{42, 42, 40},    // borderStrong
     };
 
     /**
