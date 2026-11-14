@@ -1,6 +1,7 @@
 add_executable(TestCoreOcr
         TestOcrPreprocessor.cpp
-        TestRecognitionRunner.cpp)
+        TestRecognitionRunner.cpp
+        TestPpOcrInput.cpp)
 
 target_link_libraries(TestCoreOcr PRIVATE
         Core

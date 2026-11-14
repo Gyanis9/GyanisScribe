@@ -9,5 +9,7 @@ set_property(GLOBAL APPEND PROPERTY GyanisScribeCoreSources
         ${CMAKE_CURRENT_LIST_DIR}/OcrLanguage.h
         ${CMAKE_CURRENT_LIST_DIR}/OcrLanguage.cpp
         ${CMAKE_CURRENT_LIST_DIR}/IOcrEngine.h
+        ${CMAKE_CURRENT_LIST_DIR}/PpOcrInput.h
+        ${CMAKE_CURRENT_LIST_DIR}/PpOcrInput.cpp
         ${CMAKE_CURRENT_LIST_DIR}/RecognitionRunner.h
         ${CMAKE_CURRENT_LIST_DIR}/RecognitionRunner.cpp)
