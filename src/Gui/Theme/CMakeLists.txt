@@ -7,6 +7,8 @@ set_property(GLOBAL APPEND PROPERTY GyanisScribeGuiSources
         ${CMAKE_CURRENT_LIST_DIR}/ControlPalette.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SquircleStyle.h
         ${CMAKE_CURRENT_LIST_DIR}/SquircleStyle.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/PopupSurface.h
+        ${CMAKE_CURRENT_LIST_DIR}/PopupSurface.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ThemeKind.h
         ${CMAKE_CURRENT_LIST_DIR}/ThemeKind.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ThemeManager.h

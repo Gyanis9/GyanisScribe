@@ -108,7 +108,7 @@ namespace
         explicit ToolbarSeparator(QWidget *parent = nullptr) : QWidget(parent)
         {
             setFixedWidth(5);
-            setFixedHeight(26);
+            setFixedHeight(22);
             setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
             setAttribute(Qt::WA_TransparentForMouseEvents);
         }

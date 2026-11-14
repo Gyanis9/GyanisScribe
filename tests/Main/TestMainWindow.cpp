@@ -3112,7 +3112,7 @@ TEST_F(MainWindowFixture, ClosingTheWindowHidesItForLaterReopen)
 
 /**
  * @brief 钉住品牌图与导航尺寸的接线
- * @details 窗口图标、关于页 64px 品牌图、导航 24px 是三处会被后续重构悄悄改掉的接线。
+ * @details 窗口图标、关于页 64px 品牌图、导航 16px 是三处会被后续重构悄悄改掉的接线。
  *          窗口图标只查 32 档的话，任何一枚界面图标都能过；品牌图集是唯一带 512 原生档的那一套。
  */
 TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
@@ -3123,7 +3123,7 @@ TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
 
     ASSERT_NE(nav(), nullptr);
     EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ListWidget *>(nav()), nullptr) << "导航没用自绘连续曲率的列表类";
-    EXPECT_EQ(nav()->iconSize(), QSize(24, 24));
+    EXPECT_EQ(nav()->iconSize(), QSize(16, 16));
 
     m_window->open(MainWindowPage::About);
     auto *logo = dynamic_cast<QLabel *>(controlInCurrentPage("智录图标"));

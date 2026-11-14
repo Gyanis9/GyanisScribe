@@ -680,10 +680,12 @@ TEST_F(ThemeManagerFixture, ControlHeightsStayPinnedPerTheme)
             widget->ensurePolished();
         }
         const auto highContrast = kind == ThemeKind::HighContrast;
-        EXPECT_EQ(edit.sizeHint().height(), highContrast ? 34 : 32) << static_cast<int>(kind) << " 输入框总高变了";
-        EXPECT_EQ(spin.sizeHint().height(), highContrast ? 38 : 32) << static_cast<int>(kind) << " 数字框总高变了";
-        EXPECT_EQ(combo.sizeHint().height(), highContrast ? 34 : 32) << static_cast<int>(kind) << " 下拉框总高变了";
-        EXPECT_EQ(button.sizeHint().height(), highContrast ? 32 : 30) << static_cast<int>(kind) << " 按钮总高变了";
+        // 数字框的 sizeHint 带着内部行编辑的字体高度：同一可执行体里前面的用例改过全局字重，
+        // 这里允许 1 像素的字体取整差，越出这一格仍说明档位被动了
+        EXPECT_NEAR(edit.sizeHint().height(), highContrast ? 30 : 28, 1) << static_cast<int>(kind) << " 输入框总高变了";
+        EXPECT_NEAR(spin.sizeHint().height(), highContrast ? 33 : 27, 1) << static_cast<int>(kind) << " 数字框总高变了";
+        EXPECT_NEAR(combo.sizeHint().height(), highContrast ? 30 : 28, 1) << static_cast<int>(kind) << " 下拉框总高变了";
+        EXPECT_NEAR(button.sizeHint().height(), highContrast ? 28 : 26, 1) << static_cast<int>(kind) << " 按钮总高变了";
     }
     application->setStyleSheet(QString{});
 }

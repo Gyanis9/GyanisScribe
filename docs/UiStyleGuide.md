@@ -44,9 +44,9 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 - 容器只在设置页阅读面（`#pageCard`）上有一圈静息描边：深色窗口底与卡片同值后，这圈线是圆角处唯一的边界；
   浅色档同样收一圈更轻的分界。按钮、工具按钮、列表仍不描边。
   输入类（行编辑、下拉、微调、快捷键框、标注行内编辑器与文本区）静息带一条 1px `borderStrong` 边：`controlFill` 与卡片 `surface` 只差一档微明度，没有边时输入框会融进卡片；禁用/只读退一档到 `border`，高对比度档仍按契约用 2px。
-  浅色与深色给按钮与输入类保留一条 1px 透明边框占位（数字框不带占位，改为抬高内容最小高），让控件总高固定为按钮 30、输入类 32；
+  浅色与深色给按钮与输入类保留一条 1px 透明边框占位（数字框不带占位，改为抬高内容最小高），让控件总高固定为按钮 26、输入类 28；
   换色只换底，不换尺寸。高对比度档的 2px 描边是契约，不按这一条归一化：
-  按钮 32、输入类 34、数字框 38，由 `ThemeManagerFixture.ControlHeightsStayPinnedPerTheme` 按档钉住。
+  按钮 28、输入类 30、数字框 33，由 `ThemeManagerFixture.ControlHeightsStayPinnedPerTheme` 按档钉住。
 - 浮层微边缘：压在其它内容上的面板在自绘时保留一圈 `borderStrong` 边缘（浅深 1px、高对比度 2px），
   因为 Qt 样式表没有 box-shadow，浮层只能靠这道边缘与底下的内容分开。用得上的是 `Gui::Menu`、
   `QToolTip`、`QComboBox QAbstractItemView`、`#hudRoot`、`#AnnotationToolbar` 与 Toast 气泡。
@@ -120,11 +120,11 @@ QSS 只留颜色、排版与透明边框占位：
 - 三份样式表都没有 `border-radius`，也不给形状类控件写可见的 `background-color`/`border-color`；
   文字色、选区色、下拉箭头资源、内边距、`min-width`/`min-height`/`margin`/`spacing` 仍留在样式表。
 - 浅色与深色的按钮、行编辑与下拉框保留 `1px solid transparent`、高对比度档保留 `2px solid transparent` 的
-  边框占位，控件总高按档不变（按钮 30、输入 32、高对比度档按钮 32 / 输入 34，由
+  边框占位，控件总高按档不变（按钮 26、输入 28、高对比度档按钮 28 / 输入 30，由
   `ThemeManagerFixture.ControlHeightsStayPinnedPerTheme` 钉住）。
 - 数字框不带边框占位：Qt 6.12 的 `QStyleSheetStyle` 在关掉原生按钮后会按微调框自身的边框与内边距裁内部
   行编辑，把行编辑收成 1px 宽，数值文本还在却画不出来。它的内容最小高因此补到 28（高对比度档 34），
-  叠上微调框上下各 2px 的自有框，总高仍落在 32 与 38；内部行编辑的规则只给文字色、透明底与左右 12px 缩进。
+  叠上微调框上下各 2px 的自有框，总高仍落在 28 与 33；内部行编辑的规则只给文字色、透明底与左右 12px 缩进。
 - 按钮与输入类的透明底、透明边与内边距只落在带 `squircle` 属性的自绘类上，微调框的内部行编辑只继承透明底；
   `QMessageBox`、`QInputDialog`、`QColorDialog` 里的原生按钮与 `QLineEdit`/`QComboBox`/`QSpinBox`
   保持系统外观。`QToolTip` 规则不能写任何 `border` 声明，否则样式引擎会自己画完提示面板，
@@ -307,21 +307,20 @@ QSS 只留颜色、排版与透明边框占位：
   控件树；Tab 序由 `TabWalkVisitsVisibleNamedControlsWithoutTraps` 逐页走——焦点每步
   都换、落点可见且有名字，每页至少四个落点再绕回起点。焦点环覆盖层自己无焦点策略、
   无无障碍名（`setAccessibleName` 为空），不吃鼠标。
-- 图标全部原创 SVG，统一为 **20 视框填充字形**（`fill="currentColor"`、无描边、20 逻辑像素一档渲染，
-  坐标按整像素轮廓绘制）。颜色一律由 `IconProvider` 按主题注入；用例 `IconProviderFixture`
+- 图标统一取自 Lucide 的线性字形（24 视框、2px 圆头描边、`stroke="currentColor"`、`fill="none"`）。
+  颜色一律由 `IconProvider` 按主题注入；用例 `IconProviderFixture`
   数的是真的画出来的像素，不是文件名。整套图的画法规格：
-  - 网格与安全区：20 视框，内容压在 2..18；字形无描边，孔洞用 `fill-rule="evenodd"` 从实心形状里挖出。
-    墨迹外接框中心与几何中心相差不超过 2 格。判据
-    `BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio` 与 `BundledIconsSitNearTheOpticalCenter`。
-  - 源码里不允许出现任何描边属性；填充只允许 `fill="currentColor"`，不许出现写死的色值。
-    判据 `BundledSourcesFollowTheSvgContract` 与 `BundledSourcesKeepOneFillStyleAndThemeColorsOnly`。
-  - 族内共用外框：截图族与录屏族的虚线选区、窗口外框、四角括号是同几段填充路径逐字一致——
-    改家族只改一处。判据 `CaptureAndRecordFamiliesShareFrameGeometry`。
+  - 网格与安全区：24 视框、2px 描边；墨迹外接框中心与几何中心相差不超过 2 格。
+    判据 `BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio` 与 `BundledIconsSitNearTheOpticalCenter`。
+  - 源码里只允许 `stroke="currentColor"` 与 `stroke-width="2"`，声明 `fill="none"`，不许出现写死的色值。
+    判据 `BundledSourcesFollowTheSvgContract` 与 `BundledSourcesKeepOneStrokeStyleAndThemeColorsOnly`。
+  - 族内共用几何：截图族与录屏族的选区、窗口、全屏三组源码逐字一致——改家族只改一处。
+    判据 `CaptureAndRecordFamiliesShareFrameGeometry`。
   - 高 DPI 渲染必须显式给逻辑边界：`render(painter, QRectF{0,0,size,size})`。不带边界的 `render()`
     会把 viewBox 按物理像素铺满画家视口、再叠一次位图缩放比，dpr=2 实测画成两倍大且右下半被裁
     （修复同批，判据把 2×/3× 两档都钉住）。
-  - 尺寸阶梯八档：16/20/24/32/48/64/96/128。16/20/24/32 是控件档位，96 是历史列表类别图标，
-    48/64/128 是同族大尺寸输出；导航与标注工具栏取 20 一档，填充档恰好按 20 视框落整像素，16px 托盘菜单同源缩放。
+  - 尺寸阶梯八档：16/16/24/32/48/64/96/128（16 一档由小图标与紧凑控件共用）。96 是历史列表类别图标，
+    48/64/128 是同族大尺寸输出；导航、动作条与标注工具栏取 16 一档，对话框大图取 24。
     QIcon 备齐八档，并按已连接屏幕的实际倍率（含 1.25/1.5/1.75）出副本。
     判据 `EveryBundledIconPaintsAtEveryLadderSize`、`FractionalScreenRatiosGetExactPixmaps`、
     `HistoryLadderIncludesNinetySix`。

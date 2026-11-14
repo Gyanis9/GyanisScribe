@@ -30,7 +30,7 @@ namespace GyanisScribe::Gui
     enum class IconSize
     {
         Small      = 16, ///< 菜单项与托盘行内图标
-        Medium     = 24, ///< 导航、动作条、标注工具栏：与 Lucide 的 24 视框同格，笔画落整数像素
+        Medium     = 16, ///< 导航、动作条、标注工具栏：Lucide 的 16 格原生尺寸，笔画最清楚
         Large      = 24, ///< 对话框默认档
         ExtraLarge = 32, ///< 较大的按钮与空状态
         Huge       = 48, ///< 大尺寸输出

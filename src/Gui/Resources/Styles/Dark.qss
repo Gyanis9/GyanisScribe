@@ -44,14 +44,14 @@ QLabel:disabled {
 }
 
 /* ---- 按钮：填充、描边与圆角由 Gui::Button 按状态自绘；
-        这里只留 1px 透明边框、内边距与最小高度，控件总高仍是 30。
+        这里只留 1px 透明边框、内边距与最小高度，控件总高仍是 26。
         选择器限定到带 squircle 属性的自绘类：QMessageBox、QInputDialog、QColorDialog
         里的原生 QPushButton 保留系统外观，不能落成只剩文字与图标的透明按钮 ---- */
 QPushButton[squircle="true"] {
     color: #E8E8E3;
     border: 1px solid transparent;
     padding: 0 15px;
-    min-height: 28px;
+    min-height: 24px;
 }
 
 QPushButton[squircle="true"]:disabled {
@@ -75,15 +75,15 @@ QToolButton[squircle="true"] {
     color: #E8E8E3;
     border: 1px solid transparent;
     padding: 2px;
-    min-width: 26px;
-    min-height: 26px;
+    min-width: 22px;
+    min-height: 22px;
 }
 
 /* ---- 标注工具栏的按钮：一排最多五十几件控件，最小尺寸比全局那档各收 2px，宽度省上百像素。
         颜色入口一枚按钮带菜单，原生小箭头在 20px 图标旁显得脏，收掉——按钮上的色块自己就是入口提示 ---- */
 QWidget#AnnotationToolbar QToolButton[squircle="true"] {
-    min-width: 26px;
-    min-height: 26px;
+    min-width: 22px;
+    min-height: 22px;
 }
 
 /* 颜色按钮的菜单提示：自绘一枚 6px chevron 压在色块右下，不用原生小箭头 */
@@ -97,7 +97,7 @@ QToolButton#annotationColorButton[squircle="true"]::menu-indicator {
 
 /* ---- 输入类：填充、描边与圆角由 Gui::LineEdit / Gui::ComboBox / Gui::FontComboBox / Gui::SpinBox 按启用、
         只读与焦点状态自绘；这里只留 1px 透明边框、透明底占位、内边距、最小高度与文字色，
-        控件总高仍是 32。透明底不能省：样式表一旦写了 border，QStyleSheetStyle 就会按
+        控件总高仍是 28。透明底不能省：样式表一旦写了 border，QStyleSheetStyle 就会按
         QPalette::Base 先铺一层方底，自绘的连续曲率底会被盖掉。
         选择器限定到带 squircle 属性的自绘类：原生对话窗（取色、文本输入、文件对话框）里的
         QLineEdit / QComboBox / QFontComboBox / QSpinBox 也匹配类型选择器，透明底加透明边落在它们身上就是
@@ -109,7 +109,7 @@ QLineEdit[squircle="true"], QComboBox[squircle="true"], QFontComboBox[squircle="
     background: transparent;
     border: 1px solid transparent;
     padding: 0 12px;
-    min-height: 30px;
+    min-height: 26px;
     selection-background-color: #2A3B57;
     selection-color: #E8E8E3;
 }
@@ -136,10 +136,10 @@ QSpinBox[squircle="true"] QLineEdit {
 }
 
 /* 数字框的 sizeHint 另带上下各 2px 的自有框：原来占位用的 1px 透明边框去掉后空出 2px，
-   内容高补到 28 才能与单行输入一样落在总高 32 */
+   内容高补到 24 才能与单行输入一样落在总高 28 */
 QSpinBox[squircle="true"] {
     color: #E8E8E3;
-    min-height: 28px;
+    min-height: 24px;
 }
 
 QLineEdit[squircle="true"]:disabled, QComboBox[squircle="true"]:disabled, QFontComboBox[squircle="true"]:disabled, QSpinBox[squircle="true"]:disabled,
@@ -158,7 +158,7 @@ QLabel#hotkeyDisplay {
     color: #E8E8E3;
     border: 1px solid transparent;
     padding: 0 12px;
-    min-height: 30px;
+    min-height: 26px;
 }
 
 QLabel#hotkeyDisplay:disabled {
@@ -207,7 +207,7 @@ QComboBox QAbstractItemView, QFontComboBox QAbstractItemView {
 }
 
 QComboBox QAbstractItemView::item {
-    min-height: 30px;
+    min-height: 26px;
     padding: 0 8px;
 }
 
@@ -271,7 +271,7 @@ QListWidget {
 }
 
 QListWidget::item {
-    min-height: 26px;
+    min-height: 24px;
     padding: 4px 8px;
     margin: 1px 2px;
     border: none;
@@ -285,7 +285,7 @@ QListWidget#settingsNav {
 }
 
 QListWidget#settingsNav::item {
-    min-height: 36px;
+    min-height: 30px;
 }
 
 /* ---- 设置页的滚动层 ---- */

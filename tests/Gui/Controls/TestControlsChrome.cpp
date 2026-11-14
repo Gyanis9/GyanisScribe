@@ -1,6 +1,7 @@
 // 控件外观判据：快捷键框与数字框要与圆角输入框同一套外观。
 // 与 TestGuiControls 分成两个可执行体：那个目标里的 TestToast 自己持有一份 QApplication，
 // 同一进程不能再造第二份。
+#include "Gui/Controls/ComboBox.h"
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Theme/DesignTokens.h"
@@ -11,6 +12,7 @@
 #include <gtest/gtest.h>
 
 #include <QAbstractButton>
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QKeyEvent>
@@ -258,4 +260,36 @@ TEST(TabularFiguresChrome, MetricRoleSwitchesFamilyOnlyForAsciiInDark)
 
     setVariableMetricFamilyAvailableForTesting(std::nullopt);
     setTextThemeKind(previousTheme);
+}
+
+/**
+ * @brief 钉住下拉弹层在显露之前就带上了透明底
+ * @details 弹层容器是显示时才建的原生窗口：透明属性晚一步，窗口就落在不透明表面上，
+ *          圆角外会露出一圈黑角。判据只看属性已落下，合成效果由屏幕取证模式另拍。
+ */
+TEST(PopupSurfaceFixture, ComboPopupWindowGetsATranslucentSurface)
+{
+    GyanisScribe::Gui::ComboBox combo;
+    combo.addItems({QStringLiteral("中文"), QStringLiteral("English")});
+    combo.show();
+    QCoreApplication::processEvents();
+    combo.showPopup();
+    QCoreApplication::processEvents();
+
+    auto *popup = combo.view() != nullptr ? combo.view()->window() : nullptr;
+    ASSERT_NE(popup, nullptr);
+    EXPECT_TRUE(popup->testAttribute(Qt::WA_TranslucentBackground)) << "弹层窗口没有透明底，圆角外会是一块黑角";
+    combo.hidePopup();
+}
+
+/**
+ * @brief 钉住提示窗走同一条透明表面路径
+ * @details 提示窗由 Qt 在显示时现建；这条用同窗口类型的替身验证样式代理在 polish 阶段就落了属性，
+ *          真提示窗的观感由屏幕取证模式确认。
+ */
+TEST(PopupSurfaceFixture, TooltipWindowsGetATranslucentSurfaceBeforeDisplay)
+{
+    QLabel tip{QStringLiteral("说明"), nullptr, Qt::ToolTip};
+    tip.ensurePolished();
+    EXPECT_TRUE(tip.testAttribute(Qt::WA_TranslucentBackground)) << "提示窗没有透明底，圆角外会是一块黑角";
 }

@@ -6,6 +6,7 @@
 #include "Gui/Controls/Slider.h"
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/PopupSurface.h"
 
 #include <QAbstractScrollArea>
 #include <QApplication>
@@ -95,14 +96,16 @@ namespace GyanisScribe::Gui
     void SquircleStyle::polish(QWidget *widget)
     {
         QProxyStyle::polish(widget);
-        if (!isTipLabel(widget))
+        // 提示窗与下拉弹层都由 Qt 在显示时现建：透明底要赶在原生表面创建前落下，
+        // 晚一步整窗就落到不透明表面上，圆角外只剩黑块
+        if (isTipLabel(widget) || widget->windowType() == Qt::ToolTip)
         {
-            return;
+            preparePopupSurface(widget, Core::CornerRole::Compact);
         }
-        // 提示窗是不透明顶层窗口：不放开透明底时，8px 面板的四个角外会铺一层窗口色，圆角与描边都看不出来。
-        // 透明底同时关掉系统底，可见像素只剩 PE_PanelTipLabel 画出的面板
-        widget->setAttribute(Qt::WA_TranslucentBackground);
-        widget->setAutoFillBackground(false);
+        else if (widget->inherits("QComboBoxPrivateContainer"))
+        {
+            preparePopupSurface(widget, Core::CornerRole::Control);
+        }
     }
 
     int SquircleStyle::styleHint(const StyleHint hint, const QStyleOption *option, const QWidget *widget, QStyleHintReturn *returnData) const

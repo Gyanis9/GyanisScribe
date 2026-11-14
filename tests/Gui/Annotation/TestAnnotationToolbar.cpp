@@ -366,8 +366,8 @@ namespace
         auto *button = toolbar->toolButtonAt(0);
         ASSERT_NE(button, nullptr);
         // 宏实参里不用花括号：逗号会被 GoogleTest 当成两个参数拆开（既有踩坑记录）。
-        // 图标取 24 与 Lucide 的视框同格：缩到 20 时 2px 描边落成 1.67px 灰边，看着糊
-        EXPECT_EQ(button->iconSize(), QSize(24, 24));
+        // 图标取 16：紧凑档下按钮缩到 22，16 是 Lucide 的原生网格，笔画最清楚
+        EXPECT_EQ(button->iconSize(), QSize(16, 16));
     }
 
     /**

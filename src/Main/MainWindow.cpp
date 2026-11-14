@@ -135,7 +135,7 @@ namespace
     };
 
     /// 导航列的固定宽度：最长的标签是「文字识别」四个汉字加一枚图标与左右内边距，再宽就要挤右侧的字段了
-    constexpr int kNavColumnWidth = 160;
+    constexpr int kNavColumnWidth = 148;
 
     /**
      * @brief 一行设置字段该收到多宽
@@ -1839,7 +1839,7 @@ namespace GyanisScribe::Main
         m_nav   = nav;
         m_stack = new QStackedWidget{this};
         m_nav->setObjectName(QStringLiteral("settingsNav"));
-        m_nav->setIconSize(QSize(24, 24));
+        m_nav->setIconSize(QSize(16, 16));
         m_nav->setFixedWidth(kNavColumnWidth);
         m_nav->setAccessibleName(GyanisScribe::Base::uiText("设置导航"));
         m_nav->setFrameShape(QFrame::NoFrame);

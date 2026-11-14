@@ -23,6 +23,7 @@
 #include "Core/Pick/RecentColors.h"
 #include "Core/Record/RecordingSession.h"
 #include "Gui/Capture/CaptureOverlay.h"
+#include "Gui/Controls/ComboBox.h"
 #include "Gui/Controls/Toast.h"
 #include "Gui/Memory/MemoryExcludeDialog.h"
 #include "Gui/Ocr/OcrResultWindow.h"
@@ -47,7 +48,9 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QFormLayout>
+#include <QAbstractItemView>
 #include <QImage>
+#include <QLabel>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QSystemTrayIcon>
@@ -951,6 +954,25 @@ int main(int argc, char *argv[])
                 menu->adjustSize();
                 composeShoot(*menu, std::format("colormenu-{}", name).c_str());
             }
+            // 说明框与下拉弹层是用户报过黑角的两类窗：各摆一次，从屏幕抓合成结果
+            QLabel tip{QStringLiteral("提示窗合成取证"), nullptr, Qt::ToolTip};
+            tip.move(320, 240);
+            tip.show();
+            composeShoot(tip, std::format("tooltip-{}", name).c_str());
+            GyanisScribe::Gui::ComboBox combo;
+            combo.addItems({QStringLiteral("中文"), QStringLiteral("English"), QStringLiteral("日本語")});
+            combo.move(320, 300);
+            combo.show();
+            QCoreApplication::processEvents();
+            combo.showPopup();
+            QCoreApplication::processEvents();
+            QThread::msleep(250);
+            if (auto *popup = combo.view() != nullptr ? combo.view()->window() : nullptr; popup != nullptr)
+            {
+                composeShoot(*popup, std::format("combopopup-{}", name).c_str());
+            }
+            combo.hidePopup();
+            combo.hide();
         }
         if (!settings.setValue(GyanisScribe::Core::kThemeMode, QStringLiteral("Light")))
         {

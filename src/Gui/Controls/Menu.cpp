@@ -3,6 +3,7 @@
 #include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/PopupSurface.h"
 
 #include <QAction>
 #include <QPainter>
@@ -20,8 +21,7 @@ namespace
      */
     void applyTranslucentWindow(GyanisScribe::Gui::Menu &menu)
     {
-        menu.setAttribute(Qt::WA_TranslucentBackground);
-        menu.setAutoFillBackground(false);
+        GyanisScribe::Gui::preparePopupSurface(&menu, GyanisScribe::Core::CornerRole::Panel);
     }
 } // namespace
 

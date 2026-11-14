@@ -6,6 +6,7 @@
 #include "Gui/Controls/ListView.h"
 #include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/PopupSurface.h"
 
 #include <QFontMetrics>
 #include <QPainter>
@@ -31,8 +32,8 @@ namespace
     /**
      * @brief 让弹层窗口不铺系统底色，视图的圆角外才能真的透明
      * @param combo 目标下拉框
-     * @details 弹层容器是独立的顶层窗口；面板与项高亮都由 Gui::ListView 与 ItemDelegate 画，
-     *          容器自己不再填底。不打开透明背景时，视图的透明圆角会落在容器的方底上
+     * @details 弹层容器是显示时才建的原生窗口；透明属性必须在表面创建前落下，
+     *          这里连同建好句柄的兜底重建一起交给 PopupSurface 处理
      */
     void preparePopupWindow(QComboBox &combo)
     {
@@ -41,8 +42,7 @@ namespace
         {
             return;
         }
-        popupWindow->setAttribute(Qt::WA_TranslucentBackground);
-        popupWindow->setAutoFillBackground(false);
+        GyanisScribe::Gui::preparePopupSurface(popupWindow, GyanisScribe::Core::CornerRole::Control);
     }
 } // namespace
 
@@ -85,8 +85,8 @@ namespace GyanisScribe::Gui
         setItemDelegate(new FontItemDelegate{this});
         // 可编辑档会带出原生行编辑的方框与箭头；这里只做选字体，不需要输入过滤
         setEditable(false);
-        // 与同一排的 QComboBox/QSpinBox 同高：自绘后没有原生行编辑撑高，补回 30
-        setMinimumHeight(30);
+        // 与同一排的 QComboBox/QSpinBox 同高：自绘后没有原生行编辑撑高，补回 26
+        setMinimumHeight(26);
         preparePopupWindow(*this);
     }
 

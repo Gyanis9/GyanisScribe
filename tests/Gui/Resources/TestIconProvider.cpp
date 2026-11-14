@@ -96,7 +96,7 @@ namespace
                                          IconSize::Huge,  IconSize::Display, IconSize::History, IconSize::Maximum};
 
     /// 阶梯对应的逻辑像素数，与 IconSize 的枚举值同解，这条用例把它钉住
-    constexpr std::array kLadderPixels = {16, 24, 24, 32, 48, 64, 96, 128};
+    constexpr std::array kLadderPixels = {16, 16, 24, 32, 48, 64, 96, 128};
 
     std::unique_ptr<QApplication> application;
 
@@ -310,7 +310,7 @@ TEST_F(IconProviderFixture, CacheKeyCarriesTintSizeAndRatio)
 
     // 档位与缩放比也要各归各格：尺寸按 IconSize 的档位值与夹住后的缩放比手算
     EXPECT_EQ(greenSmall.size(), QSize(16, 16));
-    EXPECT_EQ(greenMedium.size(), QSize(24, 24)) << "档位不在键里时两档会同尺寸";
+    EXPECT_EQ(greenMedium.size(), QSize(16, 16)) << "档位不在键里时两档会同尺寸";
     EXPECT_EQ(greenDoubled.size(), QSize(32, 32)) << "缩放比不在键里时高 DPI 那格会拿到低缩放的那一份";
     EXPECT_DOUBLE_EQ(greenDoubled.devicePixelRatio(), 2.0);
 }
